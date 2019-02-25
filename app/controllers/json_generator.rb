@@ -48,7 +48,7 @@ module Generator
       combinedTerms.merge!({inclusionRule => [term]})
     end
   end
-  
+    
   #Removes a sign (e.g. '=', '>') from the string if exists
   #word - a term string
   def removeSignIfExists(word)
@@ -114,24 +114,16 @@ module Generator
     quotedWordsStack.empty? ? processedWords:processedWords.concat(quotedWordsStack)
   end
   
-  def findLayers(rawQuery)
-    bracesStack = []
-    layersStack = []
-    inclRuleStack = []
-    
-    rawQuery = rawQuery.split(" ")
-    rawQuery.map do |word|
-      if(SearchRules::INCLUSION_RULES.include?(word))
-        inclRuleStack << SearchRules::INCLUSION_RULES[word]
-        if(layersStack. lengt > 1)
-        end
-      end
-      word.map do |char|
-        
-      end
-    end
-  
-  end  
+  def  combineWithCond(left, right, rule, stack)
+    lastLayer = stack.last
+    if(lastLayer && lastLayer.has_key?(rule))
+     lastLayer[rule].concat([left, right])
+    elsif(lastLayer)
+      lastLayer.merge!({rule => [left, right]})
+    else
+      stack << {rule => [left, right]}
+    end  
+  end
   
   def transform(rawQuery)  
     signedTermStack = []

@@ -1,8 +1,10 @@
 require 'rails_helper'
 require 'json_generator'
+require 'string_analizer'
 
 RSpec.configure do |c|
   c.include Generator
+  c.include StringAnalizer
 end
 
 RSpec.describe SearchRequestController, type: :controller do
@@ -119,4 +121,66 @@ RSpec.describe SearchRequestController, type: :controller do
       expect(isolateQuotedTerms(wordsArray)).to eq(expectedAr)
     end
   end
+  
+  
+  
+  #############
+  #########
+  #####
+  context "processCharacters" do
+    let(:rulesAndParen) {[]}
+    it "should put a '(' into signs stack" do
+      p termsAndSigns
+      # processCharacters("(")    
+      # expect(@@rulesAndParen.include?("(")).to be true
+    end
+    it "should put a sign into sign stack" do
+      processCharacters(">!")
+      expect(SearchRequestController.termsAndSigns.include?(">") && 
+      SearchRequestController.termsAndSigns.include?("!")).to be true
+    end
+    it "should combine characters into one string" do
+      processCharacters("<test")  
+      expect(SearchRequestController.termsAndSigns.include?("<") && 
+      SearchRequestController.termsAndSigns.include?("test")).to be true
+    end
+  end
+  
+  context "parse" do
+    let(:rulesAndParen) {[]}
+    let(:termsAndSigns) {[]}
+    it("should put inclusion rules into rulesAndParen stack") do
+      parse("test and data")
+      expect(rulesAndParen.include?("$and")).to be true
+    end
+    it("should process a single term with implicit sign correctly") do
+      result = {"$eq"=>["test"]}
+      expect(parse("test")).to eq(result)
+    end
+    it("should process a single term with explicit sign correctly") do
+      result = {"$not"=>["test"]}
+      expect(parse("!test")).to eq(result)
+    end
+    it("should process multiple terms with implicit rule and a sign") do
+      result = {"$and"=>[{"$eq"=>["test"], "$lt"=>["3"]}]}
+      expect(parse("test <3")).to eq(result)
+    end
+    it("should process multiple terms with explicit rule and a sign") do
+      result = {"$or"=>[{"$eq"=>["test"], "$lt"=>["3"]}]}
+      expect(parse("test or <3")).to eq(result)
+    end
+    it("should process multiple terms in multiple layers") do
+      result = {"$or"=>[{"$eq"=>["c", {"$and"=>[{"$eq"=>["t", "r"]}]}]}]}
+      expect(parse("c or (t r)")).to eq(result)
+    end
+    it("should handle quoted phrases correclty") do
+      result = {"$and"=>[{"$gt"=>["0"], "$not"=>["text here"]}]}
+      expect(parse("!\"text here\" and >0")).to eq(result)
+    end
+    it("should work for multiple rules in one layer") do
+      
+      p parse("a and b ")
+    end
+  end
+  
 end
