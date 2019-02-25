@@ -57,5 +57,8 @@ RSpec.describe StringAnalizer, type: :module do
       result = {"$and" => ["$eq" => ["a", "b", "c"]]}
       expect(dummy.parse("a b c")).to eq(result)
     end
+    it(" ") do
+      p dummy.parse("aa and !b OR <45")
+    end
   end
 end
