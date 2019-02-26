@@ -15,3 +15,4 @@ controller test:
 bundle exec rspec spec/controllers/search_request_controller_spec.rb
 module logic tests:
 bundle exec rspec spec/controllers/string_analizer_spec.rb
+
