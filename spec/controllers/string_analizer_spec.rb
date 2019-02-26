@@ -11,54 +11,102 @@ RSpec.describe StringAnalizer, type: :module do
 
   before(:each) { DummyTestClass.class_variable_set :@@termsAndSigns, termsAndSigns }
   before(:each) { DummyTestClass.class_variable_set :@@rulesAndParen, rulesAndParen }
-
-  context "processCharacters" do  
-    it "should put a '(' into rules and paren stack" do
-      dummy.processCharacters("(")  
-      expect(rulesAndParen.include?("(")).to be true
+  
+  context "splitIntoTokens" do 
+    it("should correclty define all tokens") do 
+      expectedResult =  ["!", "a", "<=", "b", "or", "=", "o"]
+      expect(dummy.splitIntoTokens("!a <=b or =o")).to eq(expectedResult)
     end
-    it "should put a sign into sign stack" do
-      dummy.processCharacters(">!")
-      expect(termsAndSigns.include?(">") && termsAndSigns.include?("!")).to be true
+    it("should return am empty array if the string is empty") do 
+      expectedResult = []
+      expect(dummy.splitIntoTokens("")).to eq(expectedResult)
     end
-    it "should combine characters into one string" do
-      dummy.processCharacters("<test")  
-      expect(termsAndSigns.include?("<") && termsAndSigns.include?("test")).to be true
+  end  
+  
+  context "insertDefaultEqualOperators" do 
+    it("should insert = before operands with no other unary op or before (") do 
+      input = ["a", "<=", "b", "or", "=", "o", "("]
+      expectedOutput = ["=", "a", "<=", "b", "or", "=", "o", "=", "("]
+       expect(dummy.insertDefaultEqualOperators(input)).to eq(expectedOutput)
+    end
+  end
+  
+  context "insertDefaultAndOperators" do 
+    it("should inserr 'and' before operands if not other binary op is defined") do 
+      input = ["=","a","=","b"]
+      expectedOutput = ["=", "a", "AND", "=", "b"]
+      expect(dummy.insertDefaultAndOperators(input)).to eq(expectedOutput)
+    end
+    it("should work with ()") do 
+      input = ["=", "(", "=","a","=","b", ")", "=", "p"]
+      expectedOutput = ["=", "(", "=", "a", "AND", "=", "b", ")", "AND", "=", "p"]
+      expect(dummy.insertDefaultAndOperators(input)).to eq(expectedOutput)
+    end
+  end
+  
+  context "convertToPostfix" do 
+    it("") do
+      input = ["=", "a", "and", "=", "b"]
+      expctedOutput = ["a", "=", "b", "=", "and"]
+      expect(dummy.convertToPostfix(input)).to eq(expctedOutput)
+    end
+    it("should work with ()") do
+      input = ["=", "(", "=", "a", "AND", "=", "b", ")", "AND", "=", "p"]
+      expctedOutput = ["a", "=", "b", "=", "AND", "=", "p", "=", "AND"]
+      expect(dummy.convertToPostfix(input)).to eq(expctedOutput)
+    end
+  end
+  
+  context "evaluate" do 
+    it("creates a hasf out of the post fix expression, combinnign operands with operators") do 
+      input =["a", "=", "b", "=", "AND", "=", "p", "=", "AND"]
+      expctedOutput = {"$and"=>[{"$eq"=>{"$and"=>[{"$eq"=>"a"}, {"$eq"=>"b"}]}}, {"$eq"=>"p"}]}
+      expect(dummy.evaluate(input)).to eq(expctedOutput)
     end
   end
   
   context "parse" do
     it("should process a single term with implicit sign correctly") do  
-      result = {"$eq"=>["test"]}
-      expect(dummy.parse("test")).to eq(result)
+      input = "test"
+      expctedOutput = {"$eq"=>"test"}
+      expect(dummy.parse(input)).to eq(expctedOutput)
     end
     it("should process a single term with explicit sign correctly") do
-      result = {"$not"=>["test"]}      
-      expect(dummy.parse("!test")).to eq(result)
+      input = "!test"
+      expctedOutput = {"$not"=>"test"}
+      expect(dummy.parse(input)).to eq(expctedOutput)
     end
     it("should process multiple terms with implicit rule and a sign") do
-      result = {"$and"=>[{"$lt"=>["3"]}, {"$eq"=>["test"]}]}
-      expect(dummy.parse("test <3")).to eq(result)
+      input ="test <3"
+      expctedOutput = {"$and"=>[{"$eq"=>"test"}, {"$lt"=>"3"}]}
+      expect(dummy.parse(input)).to eq(expctedOutput)
     end
     it("should process multiple terms with explicit rule and a sign") do
-      result = {"$or"=>[{"$lt"=>["3"]}, {"$eq"=>["test"]}]}
-      expect(dummy.parse("test or <3")).to eq(result)
+      input = "test or <3"
+      expectedOutput = {"$or"=>[{"$eq"=>"test"}, {"$lt"=>"3"}]}
+      expect(dummy.parse(input)).to eq(expectedOutput)
     end
     it("should process multiple terms in multiple layers") do
-      result = {"$or"=>[{"$eq"=>["c"]}], "and"=>[{"$eq"=>["t", "r"]}]}
-      p dummy.parse("c or (t r)")
-      expect(dummy.parse("c or (t r)")).to eq(result)
+      input = "c or (t r)"
+      expectedOutput = {"$or"=>[{"$eq"=>"c"}, {"$eq"=>{"$and"=>[{"$eq"=>"t"}, {"$eq"=>"r"}]}}]}
+      expect(dummy.parse(input)).to eq(expectedOutput)
     end
     it("should handle quoted phrases correclty") do
-      result = {"$and"=>[{"$gt"=>["0"]}, {"$not"=>["text here"]}]}
-      expect(dummy.parse("!\"text here\" and >0")).to eq(result)
+      input = "!\"text here\" and >0"
+      expectedOutput = {"$and"=>[{"$not"=>{"$quoted"=>"text here"}}, {"$gt"=>"0"}]}
+      expect(dummy.parse(input)).to eq(expectedOutput)
     end
     it("should work for multiple rules in one layer") do
-      result = {"$and" => ["$eq" => ["a", "b", "c"]]}
-      expect(dummy.parse("a b c")).to eq(result)
+      input = "a b c"
+      expectedOutput = {"$and"=>[{"$and"=>[{"$eq"=>"a"}, {"$eq"=>"b"}]}, {"$eq"=>"c"}]}
+      expect(dummy.parse(input)).to eq(expectedOutput)
     end
-    it(" ") do
-      p dummy.parse("aa and !b OR <45")
+    it("shoiuld work with mutiple rules in multiple layers") do
+      input = "aa !b OR (<45 >=38)"
+      expectedOutput = 
+      {"$or"=>[{"$and"=>[{"$eq"=>"aa"}, {"$not"=>"b"}]}, 
+      {"$eq"=>{"$and"=>[{"$lt"=>"45"}, {"$gte"=>"38"}]}}]}
+      expect(dummy.parse(input)).to eq(expectedOutput)
     end
   end
 end
